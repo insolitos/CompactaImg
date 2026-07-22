@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Compressor de imagens que funciona inteiramente no navegador. Nenhuma imagem é enviada para servidores.">
+<title>CompactaImg — Compressor de Imagens para Blog</title>
+<style>
+:root{
+  --bg:#0f172a; --bg2:#1e293b; --accent:#38bdf8; --accent2:#22d3ee;
+  --text:#e2e8f0; --muted:#94a3b8; --ok:#4ade80; --warn:#fbbf24; --danger:#f87171;
+  --card:#1e293b; --border:#334155;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  background:linear-gradient(135deg,#0f172a,#1e293b 60%,#0f172a); color:var(--text); min-height:100vh;
+}
+header{padding:28px 24px 12px; text-align:center;}
+header h1{margin:0 0 6px; font-size:1.8rem; background:linear-gradient(90deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; color:transparent;}
+header p{margin:0; color:var(--muted); font-size:0.95rem;}
+.container{max-width:1100px; margin:0 auto; padding:0 20px 60px;}
+.controls{
+  background:var(--card); border:1px solid var(--border); border-radius:16px;
+  padding:20px; margin:20px 0; display:flex; flex-wrap:wrap; gap:18px; align-items:flex-end;
+}
+.control-group{display:flex; flex-direction:column; gap:6px; min-width:150px;}
+.control-group label{font-size:0.8rem; color:var(--muted); font-weight:600;}
+select, input[type=number]{
+  background:#0f172a; color:var(--text); border:1px solid var(--border); border-radius:8px;
+  padding:8px 10px; font-size:0.9rem;
+}
+input[type=range]{width:180px; accent-color:var(--accent);}
+input[type=range]:disabled{opacity:0.4;}
+.range-value{font-size:0.85rem; color:var(--accent2); font-weight:700;}
+.hint{font-size:0.72rem; color:var(--warn); max-width:200px; line-height:1.3; min-height:1em;}
+.checkbox-row{display:flex; align-items:flex-start; gap:8px; max-width:230px;}
+.checkbox-row input{margin-top:2px; accent-color:var(--accent);}
+.checkbox-row label{font-size:0.8rem; font-weight:400; color:var(--text); line-height:1.35;}
+
+/* Zona de largamento: é um <label>, por isso funciona com rato, toque e teclado. */
+.dropzone{
+  display:block; border:2px dashed var(--border); border-radius:16px; padding:50px 20px;
+  text-align:center; cursor:pointer; transition:.2s; background:rgba(56,189,248,0.03);
+}
+.dropzone.dragover{border-color:var(--accent); background:rgba(56,189,248,0.08);}
+.dropzone:hover{border-color:var(--accent);}
+.dropzone:focus-within{outline:3px solid var(--accent2); outline-offset:3px; border-color:var(--accent);}
+.dropzone span.line{display:block; margin:6px 0; color:var(--muted);}
+.dropzone strong{color:var(--accent2);}
+.visually-hidden{
+  position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+  overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0;
+}
+.btn{
+  background:linear-gradient(90deg,var(--accent),var(--accent2)); color:#0f172a; border:none;
+  border-radius:10px; padding:10px 18px; font-weight:700; cursor:pointer; font-size:0.9rem;
+  transition:.15s;
+}
+.btn:hover:not(:disabled){transform:translateY(-1px); box-shadow:0 4px 14px rgba(56,189,248,0.4);}
+.btn:focus-visible{outline:3px solid var(--accent2); outline-offset:2px;}
+.btn.secondary{background:var(--border); color:var(--text);}
+.btn.small{padding:6px 12px; font-size:0.8rem;}
+.btn:disabled{opacity:0.4; cursor:not-allowed; transform:none; box-shadow:none;}
+.actions-bar{display:flex; gap:12px; margin:16px 0; flex-wrap:wrap; align-items:center;}
+.status{font-size:0.82rem; color:var(--muted); flex:1; min-width:180px;}
+.status.error{color:var(--danger);}
+.summary{
+  background:var(--card); border:1px solid var(--border); border-radius:14px; padding:16px 20px;
+  margin:16px 0; display:flex; gap:30px; flex-wrap:wrap;
+}
+.summary[hidden]{display:none;}
+.summary .stat{display:flex; flex-direction:column;}
+.summary .stat .num{font-size:1.4rem; font-weight:800; color:var(--accent2);}
+.summary .stat .num.bad{color:var(--danger);}
+.summary .stat .lbl{font-size:0.78rem; color:var(--muted);}
+.grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:16px; margin-top:10px;}
+.card{
+  background:var(--card); border:1px solid var(--border); border-radius:14px; overflow:hidden;
+  display:flex; flex-direction:column;
+}
+.card .imgwrap{height:150px; background:#0f172a; display:flex; align-items:center; justify-content:center; overflow:hidden;}
+.card img{max-width:100%; max-height:100%; object-fit:contain;}
+.card .info{padding:12px 14px; flex:1; display:flex; flex-direction:column; gap:6px;}
+.card .name{font-size:0.85rem; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.card .sizes{font-size:0.8rem; color:var(--muted); display:flex; justify-content:space-between; gap:8px;}
+.card .sizes .after{color:var(--ok); font-weight:700;}
+.card .note{font-size:0.72rem; color:var(--muted); min-height:1em;}
+.card .note.error{color:var(--danger);}
+.badge{display:inline-block; padding:2px 8px; border-radius:20px; font-size:0.72rem; font-weight:700; background:rgba(74,222,128,0.15); color:var(--ok); align-self:flex-start;}
+.badge[hidden]{display:none;}
+.imgwrap .fallback{color:var(--muted); font-size:0.75rem; padding:0 10px; text-align:center;}
+.badge.bad{background:rgba(248,113,113,0.15); color:var(--danger);}
+.badge.neutral{background:rgba(148,163,184,0.15); color:var(--muted);}
+.progress{height:6px; background:var(--border); border-radius:4px; overflow:hidden; margin-top:4px;}
+.progress .bar{height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); width:0%; transition:.2s;}
+.card .card-actions{padding:0 14px 14px; display:flex; gap:8px;}
+footer{text-align:center; color:var(--muted); font-size:0.78rem; padding:20px; border-top:1px solid var(--border);}
+@media (max-width:600px){
+  .controls{flex-direction:column; align-items:stretch;}
+  input[type=range]{width:100%;}
+  .checkbox-row{max-width:none;}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none !important;}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>📦 CompactaImg</h1>
+  <p>Reduz o peso das tuas imagens para o blog, direto no navegador — sem envio para servidores, sem dependências externas.</p>
+</header>
+
+<div class="container">
+
+  <div class="controls">
+    <div class="control-group">
+      <label for="formatSelect">Formato de saída</label>
+      <select id="formatSelect">
+        <option value="auto">Manter formato original</option>
+        <option value="image/webp">WebP (melhor compressão)</option>
+        <option value="image/jpeg">JPEG</option>
+        <option value="image/png">PNG</option>
+      </select>
+      <span class="hint" id="formatHint"></span>
+    </div>
+
+    <div class="control-group">
+      <label for="qualityRange">Qualidade (<span id="qualityValue">75</span>%)</label>
+      <input type="range" id="qualityRange" min="10" max="100" value="75">
+      <span class="hint" id="qualityHint"></span>
+    </div>
+
+    <div class="control-group">
+      <label for="maxDim">Dimensão máxima do lado maior (px)</label>
+      <input type="number" id="maxDim" min="100" max="8000" step="50" value="1600" placeholder="ex: 1600">
+    </div>
+
+    <div class="control-group checkbox-row">
+      <input type="checkbox" id="noResize">
+      <label for="noResize">Não redimensionar (só comprimir)</label>
+    </div>
+
+    <div class="control-group checkbox-row">
+      <input type="checkbox" id="neverGrow" checked>
+      <label for="neverGrow">Nunca aumentar o ficheiro (mantém o original se não compensar)</label>
+    </div>
+  </div>
+
+  <label class="dropzone" id="dropzone">
+    <span class="line"><strong>Arrasta as imagens para aqui</strong> ou clica para escolher ficheiros</span>
+    <span class="line">Suporta JPEG, PNG, WebP, BMP e GIF (estático) · Processamento local, sem upload</span>
+    <span class="line">Os metadados da fotografia (EXIF, data, GPS) são sempre removidos.</span>
+    <input type="file" id="fileInput" class="visually-hidden" accept="image/*" multiple>
+  </label>
+
+  <div class="actions-bar">
+    <button type="button" class="btn" id="processBtn" disabled>⚙️ Processar imagens</button>
+    <button type="button" class="btn secondary" id="downloadAllBtn" disabled>⬇️ Descarregar todas</button>
+    <button type="button" class="btn secondary" id="clearBtn" disabled>🗑️ Limpar</button>
+    <p class="status" id="status" role="status" aria-live="polite"></p>
+  </div>
+
+  <div class="summary" id="summary" hidden>
+    <div class="stat"><span class="num" id="statCount">0</span><span class="lbl">Imagens</span></div>
+    <div class="stat"><span class="num" id="statBefore">0 KB</span><span class="lbl">Tamanho original</span></div>
+    <div class="stat"><span class="num" id="statAfter">0 KB</span><span class="lbl">Tamanho final</span></div>
+    <div class="stat"><span class="num" id="statSaved">0%</span><span class="lbl" id="statSavedLabel">Poupança total</span></div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+</div>
+
+<footer>CompactaImg · 100% no teu navegador · Nenhuma imagem é enviada para qualquer servidor</footer>
+
+<script>
+(function(){
+  'use strict';
+
+  const dropzone       = document.getElementById('dropzone');
+  const fileInput      = document.getElementById('fileInput');
+  const grid           = document.getElementById('grid');
+  const processBtn     = document.getElementById('processBtn');
+  const downloadAllBtn = document.getElementById('downloadAllBtn');
+  const clearBtn       = document.getElementById('clearBtn');
+  const qualityRange   = document.getElementById('qualityRange');
+  const qualityValue   = document.getElementById('qualityValue');
+  const qualityHint    = document.getElementById('qualityHint');
+  const formatSelect   = document.getElementById('formatSelect');
+  const formatHint     = document.getElementById('formatHint');
+  const maxDimInput    = document.getElementById('maxDim');
+  const noResize       = document.getElementById('noResize');
+  const neverGrow      = document.getElementById('neverGrow');
+  const summary        = document.getElementById('summary');
+  const statCount      = document.getElementById('statCount');
+  const statBefore     = document.getElementById('statBefore');
+  const statAfter      = document.getElementById('statAfter');
+  const statSaved      = document.getElementById('statSaved');
+  const statSavedLabel = document.getElementById('statSavedLabel');
+  const statusEl       = document.getElementById('status');
+
+  // Limite conservador de pixels por tela. O Safari em iOS recusa telas acima
+  // de cerca de 16,7 megapixels e devolve uma imagem vazia sem qualquer aviso.
+  const MAX_PIXELS = 16777216;
+
+  let items = [];
+  let webpOK = false;
+  let busy = false;
+
+  /* ---------- utilitários ---------- */
+
+  function fmtBytes(bytes){
+    if(bytes < 1024) return bytes + ' B';
+    if(bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+    return (bytes/1024/1024).toFixed(2) + ' MB';
+  }
+
+  function setStatus(msg, isError){
+    statusEl.textContent = msg || '';
+    statusEl.classList.toggle('error', !!isError);
+  }
+
+  function formatLabel(mime){
+    if(mime === 'image/webp') return 'WebP';
+    if(mime === 'image/png')  return 'PNG';
+    if(mime === 'image/jpeg') return 'JPEG';
+    if(mime === 'image/gif')  return 'GIF';
+    if(mime === 'image/bmp')  return 'BMP';
+    return (mime || 'desconhecido').replace('image/','').toUpperCase();
+  }
+
+  function extFor(format){
+    if(format === 'image/webp') return 'webp';
+    if(format === 'image/png')  return 'png';
+    if(format === 'image/gif')  return 'gif';
+    if(format === 'image/bmp')  return 'bmp';
+    return 'jpg';
+  }
+
+  // Formatos sem canal alfa precisam de fundo opaco: caso contrário, a norma
+  // manda compor a imagem sobre preto e as zonas transparentes ficam pretas.
+  function supportsAlpha(format){
+    return format === 'image/png' || format === 'image/webp';
+  }
+
+  // O parâmetro de qualidade só é usado em formatos com perdas.
+  function isLossy(format){
+    return format === 'image/jpeg' || format === 'image/webp';
+  }
+
+  /* ---------- deteção de suporte a WebP na exportação ---------- */
+
+  function detectWebp(){
+    return new Promise(function(resolve){
+      try{
+        const c = document.createElement('canvas');
+        c.width = 1; c.height = 1;
+        c.toBlob(function(blob){
+          resolve(!!blob && blob.type === 'image/webp');
+        }, 'image/webp', 0.8);
+      } catch(e){
+        resolve(false);
+      }
+    });
+  }
+
+  /* ---------- escolha do formato de saída ---------- */
+
+  function resolveFormat(file){
+    const chosen = formatSelect.value;
+    if(chosen !== 'auto'){
+      if(chosen === 'image/webp' && !webpOK) return 'image/jpeg';
+      return chosen;
+    }
+    const t = (file.type || '').toLowerCase();
+    if(t === 'image/png')  return 'image/png';
+    if(t === 'image/jpeg') return 'image/jpeg';
+    if(t === 'image/webp') return webpOK ? 'image/webp' : 'image/jpeg';
+    // GIF, BMP e outros: o navegador não sabe escrever estes formatos.
+    // WebP é a alternativa mais próxima, porque também suporta transparência.
+    return webpOK ? 'image/webp' : 'image/png';
+  }
+
+  /* ---------- chave de definições, para não reprocessar sem necessidade ---------- */
+
+  function settingsKey(){
+    return [
+      formatSelect.value,
+      qualityRange.value,
+      maxDimInput.value,
+      noResize.checked ? '1' : '0',
+      neverGrow.checked ? '1' : '0'
+    ].join('|');
+  }
+
+  /* ---------- gestão de memória ---------- */
+
+  function setPreview(item, url, isBlob){
+    if(item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+    item.previewUrl = isBlob ? url : null;
+    const card = document.getElementById(item.id);
+    if(!card) return;
+    const img = card.querySelector('.imgwrap img');
+    if(!img) return;
+
+    // Se o endereço não resolver, tenta o endereço de dados antes de desistir.
+    img.onerror = function(){
+      img.onerror = null;
+      getDataUrl(item).then(function(dataUrl){
+        img.src = dataUrl;
+      }).catch(function(){
+        const wrap = card.querySelector('.imgwrap');
+        wrap.innerHTML = '<span class="fallback">sem pré-visualização</span>';
+      });
+    };
+    img.src = url;
+  }
+
+  function previewBlob(item, blob){
+    setPreview(item, URL.createObjectURL(blob), true);
+  }
+
+  function releaseItem(item){
+    if(item.previewUrl){
+      URL.revokeObjectURL(item.previewUrl);
+      item.previewUrl = null;
+    }
+    item.dataUrl = null;
+  }
+
+  /* ---------- entrada de ficheiros ---------- */
+
+  function addFiles(fileList){
+    const all = Array.from(fileList || []);
+    const files = all.filter(function(f){ return f.type && f.type.indexOf('image/') === 0; });
+    const rejected = all.length - files.length;
+
+    files.forEach(function(file){
+      const id = 'img_' + Math.random().toString(36).slice(2);
+      const item = {
+        id: id,
+        file: file,
+        originalSize: file.size,
+        resultBlob: null,
+        resultSize: 0,
+        outFormat: null,
+        doneKey: null,
+        keptOriginal: false,
+        previewUrl: null,
+        dataUrl: null
+      };
+      items.push(item);
+      renderCard(item);
+    });
+
+    updateButtons();
+    if(files.length && rejected){
+      setStatus(files.length + ' imagem(ns) adicionada(s). ' + rejected + ' ficheiro(s) ignorado(s) por não serem imagens.', true);
+    } else if(rejected){
+      setStatus('Nenhuma imagem adicionada: ' + rejected + ' ficheiro(s) não são imagens.', true);
+    } else if(files.length){
+      setStatus(files.length + ' imagem(ns) adicionada(s). Pronto a processar.');
+    }
+  }
+
+  /* ---------- cartões ---------- */
+
+  function renderCard(item){
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.id = item.id;
+    card.innerHTML =
+      '<div class="imgwrap"><img alt=""></div>' +
+      '<div class="info">' +
+        '<div class="name"></div>' +
+        '<div class="sizes"><span class="before"></span><span class="after">—</span></div>' +
+        '<div class="progress"><div class="bar"></div></div>' +
+        '<div class="note"></div>' +
+        '<span class="badge" hidden></span>' +
+      '</div>' +
+      '<div class="card-actions">' +
+        '<button type="button" class="btn small dl-btn" disabled>Descarregar</button>' +
+        '<button type="button" class="btn small secondary rm-btn">Remover</button>' +
+      '</div>';
+
+    // O nome do ficheiro é escrito como texto, nunca como HTML: um ficheiro
+    // chamado 'foto".png' partiria a marcação se fosse interpolado.
+    const nameEl = card.querySelector('.name');
+    nameEl.textContent = item.file.name;
+    nameEl.title = item.file.name;
+    card.querySelector('.imgwrap img').alt = 'Pré-visualização de ' + item.file.name;
+    card.querySelector('.before').textContent = 'Original: ' + fmtBytes(item.originalSize);
+
+    grid.appendChild(card);
+    previewBlob(item, item.file);
+
+    card.querySelector('.rm-btn').addEventListener('click', function(){ removeItem(item.id); });
+    card.querySelector('.dl-btn').addEventListener('click', function(){ downloadItem(item.id); });
+  }
+
+  function removeItem(id){
+    const item = items.find(function(i){ return i.id === id; });
+    if(item) releaseItem(item);
+    items = items.filter(function(i){ return i.id !== id; });
+    const el = document.getElementById(id);
+    if(el) el.remove();
+    updateButtons();
+    updateSummary();
+  }
+
+  function updateButtons(){
+    processBtn.disabled     = busy || items.length === 0;
+    clearBtn.disabled       = busy || items.length === 0;
+    downloadAllBtn.disabled = busy || !items.some(function(i){ return i.resultBlob; });
+  }
+
+  /* ---------- leitura da imagem ---------- */
+
+  // Leitura da imagem com três vias independentes.
+  //
+  // Alguns navegadores — sobretudo o Safari com a página aberta a partir do
+  // disco (file://) — não resolvem endereços blob: em elementos <img>. Nesse
+  // caso o ficheiro está perfeitamente bom e o erro seria enganador, por isso
+  // tentamos por ordem: endereço de objeto, endereço de dados e, por fim,
+  // descodificação direta do ficheiro.
+
+  function loadFromSrc(src){
+    return new Promise(function(resolve, reject){
+      const img = new Image();
+      img.onload  = function(){ resolve(img); };
+      img.onerror = function(){ reject(new Error('src')); };
+      img.src = src;
+    });
+  }
+
+  function readAsDataUrl(file){
+    return new Promise(function(resolve, reject){
+      const reader = new FileReader();
+      reader.onload  = function(){ resolve(reader.result); };
+      reader.onerror = function(){ reject(new Error('FileReader')); };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Guarda o endereço de dados no item, para não voltar a ler o ficheiro.
+  async function getDataUrl(item){
+    if(!item.dataUrl) item.dataUrl = await readAsDataUrl(item.file);
+    return item.dataUrl;
+  }
+
+  async function loadSource(item){
+    const falhas = [];
+
+    // 1) Endereço de objeto: o caminho normal, económico em memória.
+    let url = null;
+    try{
+      url = URL.createObjectURL(item.file);
+      const img = await loadFromSrc(url);
+      URL.revokeObjectURL(url);
+      return img;
+    } catch(e){
+      if(url) URL.revokeObjectURL(url);
+      falhas.push('blob');
+    }
+
+    // 2) Endereço de dados: mais pesado, mas funciona em file:// e no Safari.
+    try{
+      const img = await loadFromSrc(await getDataUrl(item));
+      return img;
+    } catch(e){
+      falhas.push('dataURL');
+    }
+
+    // 3) Descodificação direta, sem passar por um elemento <img>.
+    if(typeof createImageBitmap === 'function'){
+      try{
+        return await createImageBitmap(item.file, {imageOrientation:'from-image'});
+      } catch(e){
+        try{
+          return await createImageBitmap(item.file);
+        } catch(e2){
+          falhas.push('ImageBitmap');
+        }
+      }
+    }
+
+    const err = new Error('não foi possível descodificar a imagem');
+    err.detalhe = falhas.join(', ');
+    throw err;
+  }
+
+  function canvasToBlob(canvas, format, quality){
+    return new Promise(function(resolve){
+      if(isLossy(format)) canvas.toBlob(resolve, format, quality);
+      else canvas.toBlob(resolve, format);
+    });
+  }
+
+  /* ---------- processamento ---------- */
+
+  async function processImage(item){
+    const card = document.getElementById(item.id);
+    const bar  = card.querySelector('.bar');
+    const note = card.querySelector('.note');
+    const badge = card.querySelector('.badge');
+
+    note.classList.remove('error');
+    note.textContent = '';
+    badge.hidden = true;
+    badge.className = 'badge';
+    bar.style.width = '15%';
+
+    const img = await loadSource(item);
+    bar.style.width = '40%';
+
+    const naturalW = img.naturalWidth  || img.width;
+    const naturalH = img.naturalHeight || img.height;
+    if(!naturalW || !naturalH) throw new Error('dimensões inválidas');
+
+    // Redimensionamento pelo lado maior, para que fotografias verticais e
+    // panorâmicas fiquem também limitadas.
+    let scale = 1;
+    const maxDim = parseInt(maxDimInput.value, 10);
+    if(!noResize.checked && maxDim > 0){
+      const longest = Math.max(naturalW, naturalH);
+      if(longest > maxDim) scale = maxDim / longest;
+    }
+
+    // Segunda salvaguarda: nunca ultrapassar o limite de pixels da tela.
+    const pixels = naturalW * scale * naturalH * scale;
+    let clamped = false;
+    if(pixels > MAX_PIXELS){
+      scale = scale * Math.sqrt(MAX_PIXELS / pixels);
+      clamped = true;
+    }
+
+    const targetW = Math.max(1, Math.round(naturalW * scale));
+    const targetH = Math.max(1, Math.round(naturalH * scale));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = targetW;
+    canvas.height = targetH;
+    const ctx = canvas.getContext('2d');
+    if(!ctx) throw new Error('a tela de desenho não está disponível');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    const outFormat = resolveFormat(item.file);
+
+    // Formatos sem canal alfa: pintar o fundo de branco antes de desenhar,
+    // ou as zonas transparentes saem pretas.
+    if(!supportsAlpha(outFormat)){
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, targetW, targetH);
+    }
+
+    ctx.drawImage(img, 0, 0, targetW, targetH);
+    if(typeof ImageBitmap === 'function' && img instanceof ImageBitmap) img.close();
+    bar.style.width = '70%';
+
+    const quality = parseInt(qualityRange.value, 10) / 100;
+    const blob = await canvasToBlob(canvas, outFormat, quality);
+    if(!blob) throw new Error('o navegador não conseguiu gerar a imagem em ' + formatLabel(outFormat));
+
+    // O navegador pode ter recorrido a PNG se não souber escrever o formato pedido.
+    const realFormat = blob.type || outFormat;
+
+    let finalBlob = blob;
+    let finalFormat = realFormat;
+    item.keptOriginal = false;
+
+    if(neverGrow.checked && blob.size >= item.originalSize){
+      finalBlob = item.file;
+      finalFormat = item.file.type || realFormat;
+      item.keptOriginal = true;
+    }
+
+    item.resultBlob = finalBlob;
+    item.resultSize = finalBlob.size;
+    item.outFormat = finalFormat;
+    item.doneKey = settingsKey();
+
+    bar.style.width = '100%';
+
+    card.querySelector('.after').textContent = 'Final: ' + fmtBytes(finalBlob.size);
+
+    const diffPct = 100 - (finalBlob.size / item.originalSize * 100);
+    badge.hidden = false;
+    if(item.keptOriginal){
+      badge.textContent = 'original mantido';
+      badge.classList.add('neutral');
+    } else if(diffPct >= 0){
+      badge.textContent = '−' + diffPct.toFixed(0) + '%';
+    } else {
+      badge.textContent = '+' + Math.abs(diffPct).toFixed(0) + '%';
+      badge.classList.add('bad');
+    }
+
+    // Notas explicativas, para que nada aconteça em silêncio.
+    const notes = [];
+    if(item.keptOriginal){
+      notes.push('A compressão não compensou; ficou o ficheiro original.');
+    } else if(realFormat !== (item.file.type || realFormat)){
+      notes.push(formatLabel(item.file.type) + ' → ' + formatLabel(realFormat));
+    }
+    if(!item.keptOriginal && realFormat !== outFormat){
+      notes.push('O navegador não suporta ' + formatLabel(outFormat) + '; usou ' + formatLabel(realFormat) + '.');
+    }
+    if(scale < 1) notes.push('Redimensionada para ' + targetW + '×' + targetH + ' px.');
+    if(clamped) notes.push('Reduzida para caber no limite de tela do navegador.');
+    if(!item.keptOriginal && realFormat === 'image/png' && parseInt(qualityRange.value, 10) < 100){
+      notes.push('O PNG não usa o cursor de qualidade.');
+    }
+    note.textContent = notes.join(' ');
+
+    previewBlob(item, finalBlob);
+    card.querySelector('.dl-btn').disabled = false;
+  }
+
+  function markError(item, err){
+    const card = document.getElementById(item.id);
+    if(!card) return;
+    card.querySelector('.bar').style.width = '0%';
+    const badge = card.querySelector('.badge');
+    badge.hidden = false;
+    badge.className = 'badge bad';
+    badge.textContent = 'erro';
+    const note = card.querySelector('.note');
+    note.classList.add('error');
+    const tipo = item.file.type || 'tipo desconhecido';
+    const extra = err && err.detalhe ? ' [vias tentadas: ' + err.detalhe + ']' : '';
+    note.textContent = 'Não foi possível processar: ' + (err && err.message ? err.message : 'erro desconhecido') +
+                       ' (' + tipo + ', ' + fmtBytes(item.file.size) + ')' + extra + '.';
+    card.querySelector('.after').textContent = '—';
+    item.resultBlob = null;
+    item.resultSize = 0;
+    item.doneKey = null;
+  }
+
+  /* ---------- descarregamento ---------- */
+
+  function downloadItem(id){
+    const item = items.find(function(i){ return i.id === id; });
+    if(!item || !item.resultBlob) return;
+    const base = item.file.name.replace(/\.[^.]+$/, '');
+    const suffix = item.keptOriginal ? '' : '-compactado';
+    const url = URL.createObjectURL(item.resultBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = base + suffix + '.' + extFor(item.outFormat);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    // Revogar de imediato pode cancelar a descarga em alguns navegadores.
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 10000);
+  }
+
+  /* ---------- resumo ---------- */
+
+  function updateSummary(){
+    const done = items.filter(function(i){ return i.resultBlob; });
+    if(done.length === 0){
+      summary.hidden = true;
+      return;
+    }
+    summary.hidden = false;
+    const before = done.reduce(function(s,i){ return s + i.originalSize; }, 0);
+    const after  = done.reduce(function(s,i){ return s + i.resultSize; }, 0);
+    statCount.textContent  = done.length;
+    statBefore.textContent = fmtBytes(before);
+    statAfter.textContent  = fmtBytes(after);
+
+    const pct = before > 0 ? (100 - after / before * 100) : 0;
+    if(pct >= 0){
+      statSaved.textContent = pct.toFixed(0) + '%';
+      statSaved.classList.remove('bad');
+      statSavedLabel.textContent = 'Poupança total';
+    } else {
+      statSaved.textContent = Math.abs(pct).toFixed(0) + '%';
+      statSaved.classList.add('bad');
+      statSavedLabel.textContent = 'Aumento total';
+    }
+  }
+
+  /* ---------- estado dos controlos ---------- */
+
+  function syncControls(){
+    const chosen = formatSelect.value;
+    const isPng = chosen === 'image/png';
+
+    qualityRange.disabled = isPng;
+    if(isPng){
+      qualityHint.textContent = 'O PNG não tem perdas: este valor não é usado.';
+    } else if(chosen === 'auto'){
+      qualityHint.textContent = 'Não se aplica a ficheiros PNG.';
+    } else {
+      qualityHint.textContent = '';
+    }
+
+    if(chosen === 'image/webp' && !webpOK){
+      formatHint.textContent = 'Este navegador não exporta WebP; será usado JPEG.';
+    } else if(chosen === 'auto'){
+      formatHint.textContent = 'GIF e BMP não podem ser reescritos: saem em ' + (webpOK ? 'WebP' : 'PNG') + '.';
+    } else {
+      formatHint.textContent = '';
+    }
+
+    maxDimInput.disabled = noResize.checked;
+  }
+
+  /* ---------- eventos ---------- */
+
+  qualityRange.addEventListener('input', function(){
+    qualityValue.textContent = qualityRange.value;
+  });
+  formatSelect.addEventListener('change', syncControls);
+  noResize.addEventListener('change', syncControls);
+
+  processBtn.addEventListener('click', async function(){
+    if(busy) return;
+    busy = true;
+    updateButtons();
+    processBtn.textContent = '⏳ A processar...';
+
+    let ok = 0, failed = 0, skipped = 0;
+    const key = settingsKey();
+
+    try{
+      for(const item of items){
+        if(item.resultBlob && item.doneKey === key){ skipped++; continue; }
+        setStatus('A processar ' + item.file.name + '…');
+        try{
+          await processImage(item);
+          ok++;
+        } catch(err){
+          markError(item, err);
+          failed++;
+        }
+        updateSummary();
+      }
+    } finally {
+      // Aconteça o que acontecer, a interface volta a um estado utilizável.
+      busy = false;
+      processBtn.textContent = '⚙️ Processar imagens';
+      updateButtons();
+      updateSummary();
+    }
+
+    const parts = [];
+    if(ok) parts.push(ok + ' processada(s)');
+    if(skipped) parts.push(skipped + ' já estavam feitas');
+    if(failed) parts.push(failed + ' com erro');
+    setStatus(parts.length ? 'Concluído: ' + parts.join(', ') + '.' : 'Nada a fazer.', failed > 0);
+  });
+
+  downloadAllBtn.addEventListener('click', function(){
+    const ready = items.filter(function(i){ return i.resultBlob; });
+    if(!ready.length) return;
+    ready.forEach(function(item, idx){
+      setTimeout(function(){ downloadItem(item.id); }, idx * 700);
+    });
+    setStatus(ready.length > 5
+      ? 'A descarregar ' + ready.length + ' ficheiros. O navegador pode pedir autorização para descargas múltiplas.'
+      : 'A descarregar ' + ready.length + ' ficheiro(s).');
+  });
+
+  clearBtn.addEventListener('click', function(){
+    items.forEach(releaseItem);
+    items = [];
+    grid.innerHTML = '';
+    summary.hidden = true;
+    fileInput.value = '';
+    updateButtons();
+    setStatus('Lista limpa.');
+  });
+
+  // A zona de largamento é um <label>: o clique e o teclado já são tratados
+  // pelo navegador. Só é preciso acrescentar o arrastar-e-largar.
+  dropzone.addEventListener('dragover', function(e){
+    e.preventDefault();
+    dropzone.classList.add('dragover');
+  });
+  dropzone.addEventListener('dragleave', function(){
+    dropzone.classList.remove('dragover');
+  });
+  dropzone.addEventListener('drop', function(e){
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+    addFiles(e.dataTransfer ? e.dataTransfer.files : null);
+  });
+  window.addEventListener('dragover', function(e){ e.preventDefault(); });
+  window.addEventListener('drop', function(e){ e.preventDefault(); });
+
+  fileInput.addEventListener('change', function(e){
+    addFiles(e.target.files);
+    // Permite voltar a escolher o mesmo ficheiro depois de o remover.
+    fileInput.value = '';
+  });
+
+  window.addEventListener('beforeunload', function(){
+    items.forEach(releaseItem);
+  });
+
+  /* ---------- arranque ---------- */
+
+  detectWebp().then(function(supported){
+    webpOK = supported;
+    syncControls();
+  });
+  syncControls();
+})();
+</script>
+</body>
+</html>
