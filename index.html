@@ -109,7 +109,7 @@ footer{text-align:center; color:var(--muted); font-size:0.78rem; padding:20px; b
 <body>
 <header>
   <h1>📦 CompactaImg</h1>
-  <p>Reduz o peso das tuas imagens para o blog, direto no navegador — sem envio para servidores, sem dependências externas.</p>
+  <p>Reduz o peso das tuas imagens para o blog, diretamente no navegador — sem envio para servidores, sem dependências externas.</p>
 </header>
 
 <div class="container">
@@ -172,7 +172,7 @@ footer{text-align:center; color:var(--muted); font-size:0.78rem; padding:20px; b
   <div class="grid" id="grid"></div>
 </div>
 
-<footer>CompactaImg · 100% no teu navegador · Nenhuma imagem é enviada para qualquer servidor</footer>
+<footer>CompactaImg · 100% no teu navegador · Nenhuma imagem é enviada para qualquer servidor<br><a href="https://jfborges.com/2026/07/22/compactaimg-aligeirar-as-imagens-da-escola-sem-as-enviar-para-lado-nenhum-app/" target="_blank" rel="noopener noreferrer" style="display:inline-block;margin-top:8px;color:var(--accent2);text-decoration:none;font-weight:600">TIC, Educação e WEB</a></footer>
 
 <script>
 (function(){
@@ -409,10 +409,19 @@ footer{text-align:center; color:var(--muted); font-size:0.78rem; padding:20px; b
     updateSummary();
   }
 
+  function isCurrentResult(item){
+    return !!item.resultBlob && item.doneKey === settingsKey();
+  }
+
   function updateButtons(){
     processBtn.disabled     = busy || items.length === 0;
     clearBtn.disabled       = busy || items.length === 0;
-    downloadAllBtn.disabled = busy || !items.some(function(i){ return i.resultBlob; });
+    downloadAllBtn.disabled = busy || !items.some(isCurrentResult);
+    items.forEach(function(item){
+      const card = document.getElementById(item.id);
+      const button = card && card.querySelector('.dl-btn');
+      if(button) button.disabled = busy || !isCurrentResult(item);
+    });
   }
 
   /* ---------- leitura da imagem ---------- */
@@ -642,7 +651,7 @@ footer{text-align:center; color:var(--muted); font-size:0.78rem; padding:20px; b
 
   function downloadItem(id){
     const item = items.find(function(i){ return i.id === id; });
-    if(!item || !item.resultBlob) return;
+    if(!item || !isCurrentResult(item)) return;
     const base = item.file.name.replace(/\.[^.]+$/, '');
     const suffix = item.keptOriginal ? '' : '-compactado';
     const url = URL.createObjectURL(item.resultBlob);
@@ -659,7 +668,7 @@ footer{text-align:center; color:var(--muted); font-size:0.78rem; padding:20px; b
   /* ---------- resumo ---------- */
 
   function updateSummary(){
-    const done = items.filter(function(i){ return i.resultBlob; });
+    const done = items.filter(isCurrentResult);
     if(done.length === 0){
       summary.hidden = true;
       return;
@@ -707,15 +716,20 @@ footer{text-align:center; color:var(--muted); font-size:0.78rem; padding:20px; b
     }
 
     maxDimInput.disabled = noResize.checked;
+    updateButtons();
+    updateSummary();
   }
 
   /* ---------- eventos ---------- */
 
   qualityRange.addEventListener('input', function(){
     qualityValue.textContent = qualityRange.value;
+    syncControls();
   });
   formatSelect.addEventListener('change', syncControls);
   noResize.addEventListener('change', syncControls);
+  maxDimInput.addEventListener('input', syncControls);
+  neverGrow.addEventListener('change', syncControls);
 
   processBtn.addEventListener('click', async function(){
     if(busy) return;
@@ -755,7 +769,7 @@ footer{text-align:center; color:var(--muted); font-size:0.78rem; padding:20px; b
   });
 
   downloadAllBtn.addEventListener('click', function(){
-    const ready = items.filter(function(i){ return i.resultBlob; });
+    const ready = items.filter(isCurrentResult);
     if(!ready.length) return;
     ready.forEach(function(item, idx){
       setTimeout(function(){ downloadItem(item.id); }, idx * 700);
